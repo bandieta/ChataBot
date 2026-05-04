@@ -6,6 +6,24 @@ const API = `${BASE}/api`;
 const PASSWORD = "Dagulec";
 const AUTH_KEY = "chatabot_auth";
 
+function DogIcon({ size = 24 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+      {/* Head */}
+      <ellipse cx="12" cy="13" rx="7" ry="6.5" />
+      {/* Left ear */}
+      <path d="M5.5 9.5 C4 7 4.5 4 6.5 4 C8 4 8.5 6.5 8 9" />
+      {/* Right ear */}
+      <path d="M18.5 9.5 C20 7 19.5 4 17.5 4 C16 4 15.5 6.5 16 9" />
+      {/* Nose */}
+      <ellipse cx="12" cy="14.5" rx="2" ry="1.2" fill="white" stroke="none" />
+      {/* Eyes */}
+      <circle cx="9.5" cy="11.5" r="0.8" fill="white" stroke="none" />
+      <circle cx="14.5" cy="11.5" r="0.8" fill="white" stroke="none" />
+    </svg>
+  );
+}
+
 function PasswordGate({ onUnlock }: { onUnlock: () => void }) {
   const [value, setValue] = useState("");
   const [error, setError] = useState(false);
@@ -30,8 +48,8 @@ function PasswordGate({ onUnlock }: { onUnlock: () => void }) {
   return (
     <div className="min-h-screen flex items-center justify-center px-4">
       <div className={`glass rounded-2xl p-8 w-full max-w-sm text-center ${shake ? "animate-[shake_0.4s_ease]" : ""}`}>
-        <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center text-2xl mx-auto mb-6">
-          🦮
+        <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center mx-auto mb-6">
+          <DogIcon size={28} />
         </div>
         <h1 className="text-xl font-semibold text-white mb-1">ChataBot</h1>
         <p className="text-sm text-gray-500 mb-6">Wprowadź hasło dostępu</p>
@@ -204,8 +222,8 @@ export default function Home() {
       <header className="border-b border-white/5 bg-[#0f1117]/80 sticky top-0 z-50 backdrop-blur-xl">
         <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center text-sm">
-              🦮
+            <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center">
+              <DogIcon size={18} />
             </div>
             <div>
               <span className="font-semibold text-white">ChataBot</span>
