@@ -1,0 +1,14 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+backend/listings.db
+backend/geocache.json
+
+# Node
+frontend/node_modules/
+frontend/.next/
+
+# Env
+.env
+*.env.local
