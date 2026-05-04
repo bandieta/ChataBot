@@ -24,8 +24,11 @@ def run_scrapers():
                 if listing.area is None or not (AREA_MIN <= listing.area <= AREA_MAX):
                     continue
 
-                # Filter by distance from Katowice
-                dist = geocoder.distance_from_katowice(listing.location)
+                # Filter by distance from Katowice (use coords if available)
+                if listing.lat and listing.lng:
+                    dist = geocoder._haversine(geocoder.KATOWICE_LAT, geocoder.KATOWICE_LON, listing.lat, listing.lng)
+                else:
+                    dist = geocoder.distance_from_katowice(listing.location)
                 if dist > geocoder.MAX_DISTANCE_KM:
                     continue
 

@@ -1,3 +1,4 @@
+from .metrohouse import scrape as scrape_metrohouse
 from .rema import scrape as scrape_rema
 from .realton import scrape as scrape_realton
 from .truhome import scrape as scrape_truhome
@@ -10,6 +11,7 @@ from .base import Listing
 
 def get_all_scrapers():
     return [
+        scrape_metrohouse,
         scrape_rema,
         scrape_realton,
         scrape_truhome,

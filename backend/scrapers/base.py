@@ -10,3 +10,5 @@ class Listing:
     location: str
     price: Optional[int] = None
     area: Optional[float] = None
+    lat: Optional[float] = None
+    lng: Optional[float] = None
