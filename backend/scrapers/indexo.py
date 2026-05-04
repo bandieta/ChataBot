@@ -1,17 +1,13 @@
-"""Scraper for Indexo (indexo.com.pl) — PHP site with query-string search."""
+"""Scraper for Indexo (indexo.com.pl)."""
 import re
 import requests
 from bs4 import BeautifulSoup
-from urllib.parse import urljoin, urlencode
+from urllib.parse import urljoin
 from .base import Listing
 
 BASE = "https://www.indexo.com.pl"
+LIST_URL = f"{BASE}/oferty_nieruchomosci,DOM.html"
 HEADERS = {"User-Agent": "Mozilla/5.0 (compatible; ChataBot/1.0)"}
-
-LIST_URL = (
-    f"{BASE}/wyszukiwarka_wynik.php"
-    "?rodzajnieruchomosci=DOM&rodzajtransakcji=SPRZEDA%C5%BC"
-)
 
 
 def scrape() -> list[Listing]:
@@ -21,30 +17,36 @@ def scrape() -> list[Listing]:
         resp.raise_for_status()
         soup = BeautifulSoup(resp.text, "html.parser")
 
-        # Find links to individual listings
-        links = soup.find_all("a", href=re.compile(r"oferta|nieruchomosc|wynik_szczegoly", re.I))
-        if not links:
-            # Broader fallback
-            links = soup.find_all("a", href=re.compile(r"\.php\?"))
-
+        cards = soup.find_all(class_="listaofert_lista")
         seen = set()
-        for link in links:
-            href = link.get("href", "")
+
+        for card in cards:
+            a = card.find("a", href=re.compile(r"oferta-nieruchomosci,\d+"))
+            if not a:
+                continue
+            href = a.get("href", "")
             url = urljoin(BASE, href)
-            if url in seen or url == LIST_URL:
+            if url in seen:
                 continue
             seen.add(url)
 
-            card = link.find_parent(["tr", "div", "li", "article"]) or link
             text = card.get_text(" ", strip=True)
 
-            area_m = re.search(r"(\d+(?:[,\.]\d+)?)\s*m[²2]", text)
+            area_m = re.search(r"pow\.:\s*(\d+(?:[,\.]\d+)?)\s*m", text)
+            if not area_m:
+                area_m = re.search(r"(\d+(?:[,\.]\d+)?)\s*m[²2]", text)
             area = float(area_m.group(1).replace(",", ".")) if area_m else None
 
-            price_m = re.search(r"([\d\s\xa0]+)\s*zł", text)
-            price = int(re.sub(r"\s|\xa0", "", price_m.group(1))) if price_m else None
+            price_m = re.search(r"cena:\s*([\d\s\xa0]+)\s*zł", text, re.IGNORECASE)
+            if not price_m:
+                price_m = re.search(r"([\d\s\xa0]+)\s*zł", text)
+            price = int(re.sub(r"[\s\xa0]", "", price_m.group(1))) if price_m else None
 
-            title = link.get_text(strip=True) or f"Dom – Indexo"
+            # Title from URL slug: strip leading type prefix
+            slug = re.sub(r"oferta-nieruchomosci,\d+,", "", href)
+            slug = slug.replace(".html", "").replace("-", " ").strip()
+            slug = re.sub(r"oferta sprzedazy domu w ", "", slug, flags=re.IGNORECASE)
+            title = slug.capitalize()[:80] if slug else f"Dom – Indexo"
 
             loc_m = re.search(
                 r"(Katowice|Chorzów|Sosnowiec|Mysłowice|Tychy|Ruda Śląska|Mikołów|Bytom|Będzin|Czeladź|Siemianowice)[^\d,\n]*",

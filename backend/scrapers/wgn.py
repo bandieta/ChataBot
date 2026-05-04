@@ -5,8 +5,8 @@ from bs4 import BeautifulSoup
 from urllib.parse import urljoin
 from .base import Listing
 
-BASE = "https://katowice.wgn.pl"
-LIST_URL = f"{BASE}/oferty/domy/sprzedaz"
+BASE = "https://sprzedaz-dom-katowice.wgn.pl"
+LIST_URL = BASE
 HEADERS = {"User-Agent": "Mozilla/5.0 (compatible; ChataBot/1.0)"}
 
 

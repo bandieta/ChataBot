@@ -9,6 +9,9 @@ BASE = "https://www.truhome.eu"
 LIST_URL = f"{BASE}/oferty-nieruchomosci,DOM-na-sprzeda%C5%BC.html"
 HEADERS = {"User-Agent": "Mozilla/5.0 (compatible; ChataBot/1.0)"}
 
+RENTAL_KEYWORDS = re.compile(r"na wynajem|do wynaj[eę]cia|wynajem", re.IGNORECASE)
+CITIES = r"Katowice|Chorzów|Sosnowiec|Mysłowice|Tychy|Ruda Śląska|Mikołów|Bytom|Będzin|Czeladź|Siemianowice"
+
 
 def scrape() -> list[Listing]:
     listings = []
@@ -31,19 +34,29 @@ def scrape() -> list[Listing]:
             seen.add(listing_id)
 
             url = urljoin(BASE, href)
-            # Collect surrounding text for data
             card = link.find_parent(["div", "li", "article", "tr"]) or link
             text = card.get_text(" ", strip=True)
 
-            area_m = re.search(r"(\d+(?:[,\.]\d+)?)\s*m[²2]", text)
+            # Skip rentals
+            if RENTAL_KEYWORDS.search(text):
+                continue
+
+            area_m = re.search(r"powierzchnia:\s*(\d+(?:[,\.]\d+)?)\s*m", text)
+            if not area_m:
+                area_m = re.search(r"(\d+(?:[,\.]\d+)?)\s*m[²2]", text)
             area = float(area_m.group(1).replace(",", ".")) if area_m else None
 
-            price_m = re.search(r"([\d\s\xa0]+)\s*zł", text)
-            price = int(re.sub(r"\s|\xa0", "", price_m.group(1))) if price_m else None
+            price_m = re.search(r"Cena:\s*([\d\s\xa0]+)\s*zł", text)
+            if not price_m:
+                price_m = re.search(r"([\d\s\xa0]+)\s*zł", text)
+            price = int(re.sub(r"[\s\xa0]", "", price_m.group(1))) if price_m else None
 
-            title = link.get_text(strip=True) or f"Dom – TRUhome #{listing_id}"
+            # Extract clean title: everything before city or listing-type marker
+            link_text = link.get_text(strip=True)
+            title = re.split(rf"DOM\s+na\s+SPRZEDA[ŻZ]|({CITIES})\s*/", link_text)[0].strip()
+            title = title[:100] or f"Dom – TRUhome #{listing_id}"
 
-            loc_m = re.search(r"(Katowice|Chorzów|Sosnowiec|Mysłowice|Tychy|Ruda Śląska|Mikołów|Bytom|Będzin|Czeladź|Siemianowice)[^\d,\n]*", text)
+            loc_m = re.search(rf"({CITIES})[^\d,\n]*", text)
             location = loc_m.group(0).strip() if loc_m else ""
 
             listings.append(Listing(
