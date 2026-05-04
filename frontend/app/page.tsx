@@ -31,7 +31,7 @@ function PasswordGate({ onUnlock }: { onUnlock: () => void }) {
     <div className="min-h-screen flex items-center justify-center px-4">
       <div className={`glass rounded-2xl p-8 w-full max-w-sm text-center ${shake ? "animate-[shake_0.4s_ease]" : ""}`}>
         <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center text-2xl mx-auto mb-6">
-          🏠
+          🦮
         </div>
         <h1 className="text-xl font-semibold text-white mb-1">ChataBot</h1>
         <p className="text-sm text-gray-500 mb-6">Wprowadź hasło dostępu</p>
@@ -205,7 +205,7 @@ export default function Home() {
         <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center text-sm">
-              🏠
+              🦮
             </div>
             <div>
               <span className="font-semibold text-white">ChataBot</span>
