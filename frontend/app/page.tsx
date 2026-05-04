@@ -1,8 +1,71 @@
 "use client";
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 
 const BASE = "/ChataBot";
 const API = `${BASE}/api`;
+const PASSWORD = "Dagulec";
+const AUTH_KEY = "chatabot_auth";
+
+function PasswordGate({ onUnlock }: { onUnlock: () => void }) {
+  const [value, setValue] = useState("");
+  const [error, setError] = useState(false);
+  const [shake, setShake] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => { inputRef.current?.focus(); }, []);
+
+  const submit = () => {
+    if (value === PASSWORD) {
+      localStorage.setItem(AUTH_KEY, "1");
+      onUnlock();
+    } else {
+      setError(true);
+      setShake(true);
+      setValue("");
+      setTimeout(() => setShake(false), 500);
+      inputRef.current?.focus();
+    }
+  };
+
+  return (
+    <div className="min-h-screen flex items-center justify-center px-4">
+      <div className={`glass rounded-2xl p-8 w-full max-w-sm text-center ${shake ? "animate-[shake_0.4s_ease]" : ""}`}>
+        <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center text-2xl mx-auto mb-6">
+          🏠
+        </div>
+        <h1 className="text-xl font-semibold text-white mb-1">ChataBot</h1>
+        <p className="text-sm text-gray-500 mb-6">Wprowadź hasło dostępu</p>
+        <input
+          ref={inputRef}
+          type="password"
+          value={value}
+          onChange={e => { setValue(e.target.value); setError(false); }}
+          onKeyDown={e => e.key === "Enter" && submit()}
+          placeholder="Hasło"
+          className={`w-full bg-white/5 border rounded-xl px-4 py-3 text-white placeholder-gray-600 text-center
+            focus:outline-none focus:ring-2 transition-all mb-3
+            ${error ? "border-red-500/60 focus:ring-red-500/30" : "border-white/10 focus:ring-indigo-500/40"}`}
+        />
+        {error && <p className="text-xs text-red-400 mb-3">Nieprawidłowe hasło</p>}
+        <button
+          onClick={submit}
+          className="w-full py-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 text-white font-medium transition-all"
+        >
+          Wejdź
+        </button>
+      </div>
+      <style>{`
+        @keyframes shake {
+          0%,100% { transform: translateX(0); }
+          20% { transform: translateX(-8px); }
+          40% { transform: translateX(8px); }
+          60% { transform: translateX(-6px); }
+          80% { transform: translateX(6px); }
+        }
+      `}</style>
+    </div>
+  );
+}
 
 interface Listing {
   id: number;
@@ -75,6 +138,7 @@ function SortBtn({ col, label, sortKey, sortDir, onSort }: {
 }
 
 export default function Home() {
+  const [auth, setAuth] = useState<boolean | null>(null);
   const [listings, setListings] = useState<Listing[]>([]);
   const [agencies, setAgencies] = useState<string[]>([]);
   const [selectedAgency, setSelectedAgency] = useState("");
@@ -83,6 +147,10 @@ export default function Home() {
   const [sortKey, setSortKey] = useState<SortKey>("found_at");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
+
+  useEffect(() => {
+    setAuth(localStorage.getItem(AUTH_KEY) === "1");
+  }, []);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -126,6 +194,9 @@ export default function Home() {
 
   const interested = listings.filter(l => l.interested);
   const avgPrice = listings.filter(l => l.price).reduce((s, l) => s + l.price!, 0) / (listings.filter(l => l.price).length || 1);
+
+  if (auth === null) return null; // hydration guard
+  if (!auth) return <PasswordGate onUnlock={() => setAuth(true)} />;
 
   return (
     <div className="min-h-screen">
