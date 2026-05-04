@@ -1,7 +1,8 @@
 "use client";
 import { useEffect, useState, useCallback } from "react";
 
-const API = "/api";
+const BASE = "/ChataBot";
+const API = `${BASE}/api`;
 
 interface Listing {
   id: number;
@@ -19,25 +20,64 @@ interface Listing {
 type SortKey = "found_at" | "price" | "area" | "distance_km" | "price_per_m2";
 type SortDir = "asc" | "desc";
 
-function fmt_price(p: number | null) {
-  if (!p) return "—";
-  return p.toLocaleString("pl-PL") + " zł";
+const fmtPrice = (p: number | null) =>
+  p ? p.toLocaleString("pl-PL") + " zł" : "—";
+
+const pricePerM2 = (l: Listing) =>
+  l.price && l.area ? Math.round(l.price / l.area) : null;
+
+const fmtDate = (s: string) => {
+  const d = new Date(s.replace(" ", "T"));
+  return d.toLocaleDateString("pl-PL", { day: "2-digit", month: "short", year: "numeric" });
+};
+
+const AGENCY_COLORS: Record<string, string> = {
+  "SCN": "bg-violet-500/20 text-violet-300 border-violet-500/30",
+  "Łowcy Nieruchomości": "bg-blue-500/20 text-blue-300 border-blue-500/30",
+  "TRUhome": "bg-emerald-500/20 text-emerald-300 border-emerald-500/30",
+  "REMA": "bg-orange-500/20 text-orange-300 border-orange-500/30",
+  "Realton": "bg-pink-500/20 text-pink-300 border-pink-500/30",
+  "Kopalnia Nieruchomości": "bg-amber-500/20 text-amber-300 border-amber-500/30",
+  "Indexo": "bg-cyan-500/20 text-cyan-300 border-cyan-500/30",
+  "WGN Katowice": "bg-red-500/20 text-red-300 border-red-500/30",
+};
+
+const agencyColor = (a: string) =>
+  AGENCY_COLORS[a] ?? "bg-gray-500/20 text-gray-300 border-gray-500/30";
+
+function StatCard({ label, value, sub }: { label: string; value: string | number; sub?: string }) {
+  return (
+    <div className="glass rounded-2xl px-5 py-4">
+      <div className="text-xs text-gray-500 uppercase tracking-widest mb-1">{label}</div>
+      <div className="text-2xl font-semibold text-white">{value}</div>
+      {sub && <div className="text-xs text-gray-500 mt-0.5">{sub}</div>}
+    </div>
+  );
 }
 
-function price_per_m2(l: Listing): number | null {
-  if (!l.price || !l.area) return null;
-  return Math.round(l.price / l.area);
-}
-
-function SortIcon({ active, dir }: { active: boolean; dir: SortDir }) {
-  if (!active) return <span className="text-gray-300 ml-1">↕</span>;
-  return <span className="text-blue-600 ml-1">{dir === "asc" ? "↑" : "↓"}</span>;
+function SortBtn({ col, label, sortKey, sortDir, onSort }: {
+  col: SortKey; label: string; sortKey: SortKey; sortDir: SortDir;
+  onSort: (k: SortKey) => void;
+}) {
+  const active = sortKey === col;
+  return (
+    <button
+      onClick={() => onSort(col)}
+      className={`flex items-center gap-1 text-xs uppercase tracking-wider font-medium transition-colors select-none
+        ${active ? "text-indigo-400" : "text-gray-500 hover:text-gray-300"}`}
+    >
+      {label}
+      <span className="text-[10px]">
+        {active ? (sortDir === "asc" ? "▲" : "▼") : "⇅"}
+      </span>
+    </button>
+  );
 }
 
 export default function Home() {
   const [listings, setListings] = useState<Listing[]>([]);
   const [agencies, setAgencies] = useState<string[]>([]);
-  const [selectedAgency, setSelectedAgency] = useState<string>("");
+  const [selectedAgency, setSelectedAgency] = useState("");
   const [showInterested, setShowInterested] = useState(false);
   const [loading, setLoading] = useState(true);
   const [sortKey, setSortKey] = useState<SortKey>("found_at");
@@ -46,196 +86,261 @@ export default function Home() {
 
   const load = useCallback(async () => {
     setLoading(true);
-    const qs = selectedAgency ? `?agency=${encodeURIComponent(selectedAgency)}` : "";
-    const [listRes, agRes] = await Promise.all([
-      fetch(`${API}/listings${qs}`),
-      fetch(`${API}/agencies`),
-    ]);
-    setListings(await listRes.json());
-    setAgencies(await agRes.json());
-    setLastRefresh(new Date());
+    try {
+      const qs = selectedAgency ? `?agency=${encodeURIComponent(selectedAgency)}` : "";
+      const [listRes, agRes] = await Promise.all([
+        fetch(`${API}/listings${qs}`),
+        fetch(`${API}/agencies`),
+      ]);
+      setListings(await listRes.json());
+      setAgencies(await agRes.json());
+      setLastRefresh(new Date());
+    } catch (e) {
+      console.error(e);
+    }
     setLoading(false);
   }, [selectedAgency]);
 
   useEffect(() => { load(); }, [load]);
 
-  const toggleInterest = async (id: number, current: number) => {
-    const next = current === 0;
-    await fetch(`${API}/listings/${id}/interest?interested=${next}`, { method: "PATCH" });
-    setListings((prev) =>
-      prev.map((l) => (l.id === id ? { ...l, interested: next ? 1 : 0 } : l))
-    );
-  };
-
   const handleSort = (key: SortKey) => {
-    if (sortKey === key) {
-      setSortDir((d) => (d === "asc" ? "desc" : "asc"));
-    } else {
-      setSortKey(key);
-      setSortDir(key === "found_at" ? "desc" : "asc");
-    }
+    if (sortKey === key) setSortDir(d => d === "asc" ? "desc" : "asc");
+    else { setSortKey(key); setSortDir(key === "found_at" ? "desc" : "asc"); }
   };
 
-  const filtered = showInterested ? listings.filter((l) => l.interested) : listings;
+  const toggleInterest = async (id: number, current: number) => {
+    const next = !current;
+    await fetch(`${API}/listings/${id}/interest?interested=${next}`, { method: "PATCH" });
+    setListings(prev => prev.map(l => l.id === id ? { ...l, interested: next ? 1 : 0 } : l));
+  };
 
+  const filtered = showInterested ? listings.filter(l => l.interested) : listings;
   const sorted = [...filtered].sort((a, b) => {
     let av: number | null, bv: number | null;
-    if (sortKey === "price_per_m2") {
-      av = price_per_m2(a);
-      bv = price_per_m2(b);
-    } else if (sortKey === "found_at") {
-      av = new Date(a.found_at).getTime();
-      bv = new Date(b.found_at).getTime();
-    } else {
-      av = a[sortKey];
-      bv = b[sortKey];
-    }
-    if (av === null) return 1;
-    if (bv === null) return -1;
+    if (sortKey === "price_per_m2") { av = pricePerM2(a); bv = pricePerM2(b); }
+    else if (sortKey === "found_at") { av = new Date(a.found_at).getTime(); bv = new Date(b.found_at).getTime(); }
+    else { av = a[sortKey]; bv = b[sortKey]; }
+    if (av == null) return 1; if (bv == null) return -1;
     return sortDir === "asc" ? av - bv : bv - av;
   });
 
-  const interestedCount = listings.filter((l) => l.interested).length;
-
-  const Th = ({ label, sk }: { label: string; sk: SortKey }) => (
-    <th
-      className="px-3 py-2 cursor-pointer select-none hover:bg-gray-200 whitespace-nowrap"
-      onClick={() => handleSort(sk)}
-    >
-      {label}
-      <SortIcon active={sortKey === sk} dir={sortDir} />
-    </th>
-  );
+  const interested = listings.filter(l => l.interested);
+  const avgPrice = listings.filter(l => l.price).reduce((s, l) => s + l.price!, 0) / (listings.filter(l => l.price).length || 1);
 
   return (
-    <main className="max-w-7xl mx-auto px-4 py-6">
-      <div className="flex items-center justify-between mb-5">
-        <div>
-          <h1 className="text-2xl font-bold">Domy w Katowicach ±15 km</h1>
-          <p className="text-sm text-gray-500 mt-0.5">
-            100–180 m² · sprzedaż · {listings.length} ogłoszeń
-            {interestedCount > 0 && ` · ${interestedCount} zainteresowanych`}
-          </p>
+    <div className="min-h-screen">
+      {/* Header */}
+      <header className="border-b border-white/5 bg-[#0f1117]/80 sticky top-0 z-50 backdrop-blur-xl">
+        <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center text-sm">
+              🏠
+            </div>
+            <div>
+              <span className="font-semibold text-white">ChataBot</span>
+              <span className="text-gray-500 text-sm ml-2">Katowice ±15 km</span>
+            </div>
+          </div>
+          <div className="flex items-center gap-3">
+            {lastRefresh && (
+              <span className="text-xs text-gray-600 hidden sm:block">
+                {lastRefresh.toLocaleTimeString("pl-PL", { hour: "2-digit", minute: "2-digit" })}
+              </span>
+            )}
+            <button
+              onClick={load}
+              disabled={loading}
+              className="px-4 py-2 rounded-xl text-sm font-medium bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+            >
+              {loading ? (
+                <span className="inline-block w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+              ) : "Odśwież"}
+            </button>
+          </div>
         </div>
-        <button
-          onClick={load}
-          className="text-sm px-3 py-1.5 rounded border border-gray-300 hover:bg-gray-50 active:bg-gray-100"
-          disabled={loading}
-        >
-          {loading ? "…" : "Odśwież"}
-        </button>
-      </div>
+      </header>
 
-      {/* Filters */}
-      <div className="flex flex-wrap gap-3 mb-4 items-center">
-        <select
-          className="border rounded px-3 py-1.5 text-sm bg-white"
-          value={selectedAgency}
-          onChange={(e) => setSelectedAgency(e.target.value)}
-        >
-          <option value="">Wszystkie agencje ({agencies.length})</option>
-          {agencies.map((a) => (
-            <option key={a} value={a}>{a}</option>
-          ))}
-        </select>
-
-        <label className="flex items-center gap-2 text-sm cursor-pointer">
-          <input
-            type="checkbox"
-            checked={showInterested}
-            onChange={(e) => setShowInterested(e.target.checked)}
-            className="w-4 h-4 accent-green-600"
+      <main className="max-w-7xl mx-auto px-6 py-8">
+        {/* Stats */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-8">
+          <StatCard label="Ogłoszenia" value={listings.length} sub="spełniające kryteria" />
+          <StatCard label="Zainteresowane" value={interested.length} sub={interested.length ? "zaznaczone" : "brak"} />
+          <StatCard
+            label="Śr. cena"
+            value={listings.length ? Math.round(avgPrice / 1000) + " tys." : "—"}
+            sub="zł"
           />
-          Tylko zainteresowane
-        </label>
+          <StatCard label="Agencje" value={agencies.length} sub="aktywnych" />
+        </div>
 
-        {lastRefresh && (
-          <span className="text-xs text-gray-400 ml-auto">
-            Odświeżono: {lastRefresh.toLocaleTimeString("pl-PL")}
-          </span>
+        {/* Filters */}
+        <div className="flex flex-wrap gap-3 mb-6">
+          <div className="relative">
+            <select
+              className="glass rounded-xl px-4 py-2.5 text-sm text-gray-200 bg-transparent appearance-none pr-8 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 cursor-pointer"
+              value={selectedAgency}
+              onChange={e => setSelectedAgency(e.target.value)}
+            >
+              <option value="" className="bg-[#1a1d27]">Wszystkie agencje</option>
+              {agencies.map(a => <option key={a} value={a} className="bg-[#1a1d27]">{a}</option>)}
+            </select>
+            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none text-xs">▾</span>
+          </div>
+
+          <button
+            onClick={() => setShowInterested(s => !s)}
+            className={`px-4 py-2.5 rounded-xl text-sm font-medium border transition-all
+              ${showInterested
+                ? "bg-green-500/20 border-green-500/40 text-green-300"
+                : "glass text-gray-400 hover:text-gray-200"}`}
+          >
+            ★ Zainteresowane
+            {interested.length > 0 && (
+              <span className="ml-2 px-1.5 py-0.5 bg-green-500/30 rounded-md text-xs text-green-300">
+                {interested.length}
+              </span>
+            )}
+          </button>
+
+          <div className="ml-auto flex items-center gap-2 text-sm text-gray-500">
+            <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse inline-block" />
+            {sorted.length} wyników
+          </div>
+        </div>
+
+        {/* Table */}
+        {loading && (
+          <div className="glass rounded-2xl p-16 flex items-center justify-center">
+            <div className="flex flex-col items-center gap-3">
+              <div className="w-8 h-8 border-2 border-indigo-500/30 border-t-indigo-400 rounded-full animate-spin" />
+              <span className="text-sm text-gray-500">Ładowanie ofert…</span>
+            </div>
+          </div>
         )}
-      </div>
 
-      {loading && (
-        <div className="text-center py-16 text-gray-400">Ładowanie…</div>
-      )}
+        {!loading && sorted.length === 0 && (
+          <div className="glass rounded-2xl p-16 text-center text-gray-500">
+            Brak ogłoszeń spełniających kryteria.
+          </div>
+        )}
 
-      {!loading && sorted.length === 0 && (
-        <div className="text-center py-16 text-gray-400">
-          Brak ogłoszeń spełniających kryteria.
-        </div>
-      )}
+        {!loading && sorted.length > 0 && (
+          <div className="glass rounded-2xl overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b border-white/5">
+                    <th className="px-5 py-3.5 text-left w-10"></th>
+                    <th className="px-5 py-3.5 text-left text-xs text-gray-500 uppercase tracking-wider font-medium">Agencja</th>
+                    <th className="px-5 py-3.5 text-left text-xs text-gray-500 uppercase tracking-wider font-medium">Oferta</th>
+                    <th className="px-5 py-3.5 text-left">
+                      <SortBtn col="area" label="Pow." sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
+                    </th>
+                    <th className="px-5 py-3.5 text-left">
+                      <SortBtn col="price" label="Cena" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
+                    </th>
+                    <th className="px-5 py-3.5 text-left hidden md:table-cell">
+                      <SortBtn col="price_per_m2" label="zł/m²" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
+                    </th>
+                    <th className="px-5 py-3.5 text-left hidden sm:table-cell">
+                      <SortBtn col="distance_km" label="Odl." sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
+                    </th>
+                    <th className="px-5 py-3.5 text-left hidden lg:table-cell">
+                      <SortBtn col="found_at" label="Data" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-white/[0.04]">
+                  {sorted.map((l) => {
+                    const ppm = pricePerM2(l);
+                    return (
+                      <tr
+                        key={l.id}
+                        className={`group transition-colors
+                          ${l.interested
+                            ? "bg-green-500/5 hover:bg-green-500/10"
+                            : "hover:bg-white/[0.03]"}`}
+                      >
+                        <td className="px-5 py-4">
+                          <button
+                            onClick={() => toggleInterest(l.id, l.interested)}
+                            className={`text-lg transition-all hover:scale-110 active:scale-95
+                              ${l.interested ? "opacity-100" : "opacity-20 hover:opacity-60"}`}
+                            title="Zainteresowany"
+                          >
+                            ★
+                          </button>
+                        </td>
+                        <td className="px-5 py-4">
+                          <span className={`text-xs px-2.5 py-1 rounded-lg border font-medium ${agencyColor(l.agency)}`}>
+                            {l.agency}
+                          </span>
+                        </td>
+                        <td className="px-5 py-4 max-w-xs">
+                          <a
+                            href={l.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-sm text-gray-200 hover:text-white hover:underline underline-offset-2 font-medium line-clamp-1"
+                          >
+                            {l.title || "Ogłoszenie"}
+                          </a>
+                          <div className="text-xs text-gray-600 mt-0.5 sm:hidden">
+                            {l.distance_km != null ? `${l.distance_km.toFixed(1)} km` : ""}{" "}
+                            {l.location}
+                          </div>
+                          <div className="text-xs text-gray-600 mt-0.5 hidden sm:block">
+                            {l.location}
+                          </div>
+                        </td>
+                        <td className="px-5 py-4 whitespace-nowrap">
+                          <span className="text-sm font-semibold text-white">
+                            {l.area ? `${l.area} m²` : "—"}
+                          </span>
+                        </td>
+                        <td className="px-5 py-4 whitespace-nowrap">
+                          <span className="text-sm font-semibold text-white">
+                            {l.price ? (l.price / 1000).toFixed(0) + "k" : "—"}
+                          </span>
+                          <span className="text-xs text-gray-500 ml-1">zł</span>
+                        </td>
+                        <td className="px-5 py-4 whitespace-nowrap hidden md:table-cell">
+                          {ppm ? (
+                            <span className="text-sm text-gray-300">
+                              {ppm.toLocaleString("pl-PL")}
+                              <span className="text-xs text-gray-600 ml-1">zł</span>
+                            </span>
+                          ) : "—"}
+                        </td>
+                        <td className="px-5 py-4 whitespace-nowrap hidden sm:table-cell">
+                          {l.distance_km != null ? (
+                            <div className="flex items-center gap-2">
+                              <div className="w-12 h-1 bg-gray-800 rounded-full overflow-hidden">
+                                <div
+                                  className="h-full bg-indigo-500 rounded-full"
+                                  style={{ width: `${Math.min(100, (l.distance_km / 15) * 100)}%` }}
+                                />
+                              </div>
+                              <span className="text-xs text-gray-400">{l.distance_km.toFixed(1)} km</span>
+                            </div>
+                          ) : "—"}
+                        </td>
+                        <td className="px-5 py-4 whitespace-nowrap hidden lg:table-cell">
+                          <span className="text-xs text-gray-500">{fmtDate(l.found_at)}</span>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
 
-      {!loading && sorted.length > 0 && (
-        <div className="overflow-x-auto rounded-lg border border-gray-200 shadow-sm">
-          <table className="w-full text-sm">
-            <thead className="bg-gray-100 text-left text-xs uppercase tracking-wide text-gray-600">
-              <tr>
-                <th className="px-3 py-2 w-8"></th>
-                <th className="px-3 py-2">Agencja</th>
-                <th className="px-3 py-2">Tytuł</th>
-                <th className="px-3 py-2">Lokalizacja</th>
-                <Th label="Pow." sk="area" />
-                <Th label="Cena" sk="price" />
-                <Th label="zł/m²" sk="price_per_m2" />
-                <Th label="Odl." sk="distance_km" />
-                <Th label="Data" sk="found_at" />
-              </tr>
-            </thead>
-            <tbody>
-              {sorted.map((l) => (
-                <tr
-                  key={l.id}
-                  className={`border-t transition-colors hover:bg-gray-50 ${
-                    l.interested ? "bg-green-50 hover:bg-green-100" : ""
-                  }`}
-                >
-                  <td className="px-3 py-2 text-center">
-                    <input
-                      type="checkbox"
-                      checked={l.interested === 1}
-                      onChange={() => toggleInterest(l.id, l.interested)}
-                      className="w-4 h-4 cursor-pointer accent-green-600"
-                      title="Zainteresowany"
-                    />
-                  </td>
-                  <td className="px-3 py-2 whitespace-nowrap text-xs font-medium text-gray-600">
-                    {l.agency}
-                  </td>
-                  <td className="px-3 py-2 max-w-xs">
-                    <a
-                      href={l.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-blue-600 hover:underline line-clamp-2"
-                    >
-                      {l.title || "Ogłoszenie"}
-                    </a>
-                  </td>
-                  <td className="px-3 py-2 whitespace-nowrap text-xs text-gray-600">
-                    {l.location}
-                  </td>
-                  <td className="px-3 py-2 whitespace-nowrap font-medium">
-                    {l.area ? `${l.area} m²` : "—"}
-                  </td>
-                  <td className="px-3 py-2 whitespace-nowrap font-medium">
-                    {fmt_price(l.price)}
-                  </td>
-                  <td className="px-3 py-2 whitespace-nowrap text-gray-500">
-                    {price_per_m2(l) ? `${price_per_m2(l)?.toLocaleString("pl-PL")} zł` : "—"}
-                  </td>
-                  <td className="px-3 py-2 whitespace-nowrap text-xs text-gray-500">
-                    {l.distance_km != null ? `${l.distance_km.toFixed(1)} km` : "—"}
-                  </td>
-                  <td className="px-3 py-2 whitespace-nowrap text-xs text-gray-400">
-                    {l.found_at?.slice(0, 16).replace("T", " ")}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-    </main>
+        <footer className="mt-8 text-center text-xs text-gray-700">
+          Filtr: sprzedaż · dom · 100–180 m² · ≤15 km od Katowic · aktualizacja co godzinę
+        </footer>
+      </main>
+    </div>
   );
 }
