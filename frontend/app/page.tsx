@@ -85,6 +85,42 @@ function PasswordGate({ onUnlock }: { onUnlock: () => void }) {
   );
 }
 
+interface ScrapeResult {
+  total: number;
+  nearby: number;
+  new: number;
+}
+
+function Toast({ data, onDone }: { data: ScrapeResult; onDone: () => void }) {
+  const [visible, setVisible] = useState(true);
+
+  useEffect(() => {
+    const t = setTimeout(() => setVisible(false), 5000);
+    return () => clearTimeout(t);
+  }, []);
+
+  return (
+    <div
+      className={`fixed bottom-6 right-6 z-50 glass rounded-2xl px-6 py-4 shadow-2xl transition-all duration-700
+        ${visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-3 pointer-events-none"}`}
+      onTransitionEnd={() => { if (!visible) onDone(); }}
+    >
+      <div className="text-sm font-semibold text-white mb-1">Skanowanie zakończone</div>
+      <div className="text-xs text-gray-400 leading-relaxed">
+        Znaleziono <span className="text-white font-medium">{data.total}</span> ogłoszeń łącznie
+        <br />
+        W zasięgu 20 km: <span className="text-indigo-300 font-medium">{data.nearby}</span>
+        {data.new > 0 && (
+          <> · <span className="text-green-400 font-medium">+{data.new} nowych</span></>
+        )}
+        {data.new === 0 && (
+          <> · <span className="text-gray-500">brak nowych</span></>
+        )}
+      </div>
+    </div>
+  );
+}
+
 interface Listing {
   id: number;
   url: string;
@@ -162,9 +198,11 @@ export default function Home() {
   const [selectedAgency, setSelectedAgency] = useState("");
   const [showInterested, setShowInterested] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [scraping, setScraping] = useState(false);
   const [sortKey, setSortKey] = useState<SortKey>("found_at");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
+  const [toast, setToast] = useState<ScrapeResult | null>(null);
 
   useEffect(() => {
     setAuth(localStorage.getItem(AUTH_KEY) === "1");
@@ -192,6 +230,19 @@ export default function Home() {
   const handleSort = (key: SortKey) => {
     if (sortKey === key) setSortDir(d => d === "asc" ? "desc" : "asc");
     else { setSortKey(key); setSortDir(key === "found_at" ? "desc" : "asc"); }
+  };
+
+  const scrapeNow = async () => {
+    setScraping(true);
+    try {
+      const res = await fetch(`${API}/scrape`, { method: "POST" });
+      const data: ScrapeResult = await res.json();
+      await load();
+      setToast(data);
+    } catch (e) {
+      console.error(e);
+    }
+    setScraping(false);
   };
 
   const toggleInterest = async (id: number, current: number) => {
@@ -237,13 +288,12 @@ export default function Home() {
               </span>
             )}
             <button
-              onClick={load}
-              disabled={loading}
-              className="px-4 py-2 rounded-xl text-sm font-medium bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+              onClick={scrapeNow}
+              disabled={loading || scraping}
+              className="px-4 py-2 rounded-xl text-sm font-medium bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 disabled:cursor-not-allowed transition-all flex items-center gap-2"
             >
-              {loading ? (
-                <span className="inline-block w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-              ) : "Odśwież"}
+              <span className={`inline-block w-4 h-4 border-2 border-white/30 border-t-white rounded-full ${scraping || loading ? "animate-spin" : "hidden"}`} />
+              {scraping ? "Skanuję…" : "Odśwież"}
             </button>
           </div>
         </div>
@@ -430,6 +480,8 @@ export default function Home() {
           Filtr: sprzedaż · dom · 100–180 m² · ≤20 km od Katowic · aktualizacja co godzinę
         </footer>
       </main>
+
+      {toast && <Toast data={toast} onDone={() => setToast(null)} />}
     </div>
   );
 }

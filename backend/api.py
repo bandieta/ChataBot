@@ -2,6 +2,7 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from typing import Optional
+import asyncio
 import db
 
 db.init_db()
@@ -10,7 +11,7 @@ app = FastAPI()
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:3001", "https://dagora.tech"],
-    allow_methods=["GET", "PATCH"],
+    allow_methods=["GET", "PATCH", "POST"],
     allow_headers=["*"],
 )
 
@@ -30,3 +31,54 @@ def list_agencies():
 def toggle_interest(listing_id: int, interested: bool):
     db.set_interested(listing_id, interested)
     return {"ok": True}
+
+
+def _run_scrapers_sync() -> dict:
+    import geocoder
+    from scrapers import get_all_scrapers
+
+    AREA_MIN, AREA_MAX = 100.0, 180.0
+    total = 0
+    nearby = 0
+    new_added = 0
+
+    for scraper in get_all_scrapers():
+        try:
+            listings = scraper()
+            total += len(listings)
+            for listing in listings:
+                if listing.area is None or not (AREA_MIN <= listing.area <= AREA_MAX):
+                    continue
+                if listing.lat and listing.lng:
+                    dist = geocoder._haversine(
+                        geocoder.KATOWICE_LAT, geocoder.KATOWICE_LON,
+                        listing.lat, listing.lng,
+                    )
+                else:
+                    dist = geocoder.distance_from_katowice(listing.location)
+                if dist > geocoder.MAX_DISTANCE_KM:
+                    continue
+                nearby += 1
+                if db.is_known(listing.url):
+                    continue
+                db.insert(
+                    url=listing.url,
+                    agency=listing.agency,
+                    title=listing.title,
+                    location=listing.location,
+                    price=listing.price,
+                    area=listing.area,
+                    distance_km=dist,
+                )
+                new_added += 1
+        except Exception as e:
+            print(f"[scrape] {e}")
+
+    return {"total": total, "nearby": nearby, "new": new_added}
+
+
+@app.post("/scrape")
+async def scrape_now():
+    loop = asyncio.get_event_loop()
+    result = await loop.run_in_executor(None, _run_scrapers_sync)
+    return result
