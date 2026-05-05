@@ -12,8 +12,8 @@ from .base import Listing
 HEADERS = {"User-Agent": "Mozilla/5.0 (compatible; ChataBot/1.0)"}
 
 
-def scrape_ire(agency_name: str, base_url: str) -> list[Listing]:
-    url = f"{base_url}/oferty/domy/sprzedaz/"
+def scrape_ire(agency_name: str, base_url: str, listing_path: str = "/oferty/domy/sprzedaz/") -> list[Listing]:
+    url = base_url.rstrip("/") + "/" + listing_path.lstrip("/")
     listings = []
     try:
         resp = requests.get(url, timeout=15, headers=HEADERS)
