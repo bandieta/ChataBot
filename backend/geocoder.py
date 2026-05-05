@@ -70,7 +70,10 @@ def _save_cache():
 _load_cache()
 
 
+_PL_CHARS = str.maketrans("łŁ", "lL")
+
 def _normalize(text: str) -> str:
+    text = text.translate(_PL_CHARS)
     nfkd = unicodedata.normalize("NFKD", text.lower())
     return "".join(c for c in nfkd if not unicodedata.combining(c))
 
@@ -119,11 +122,18 @@ def distance_from_katowice(location: str) -> float:
     norm = _normalize(location).replace("-", " ").replace(",", " ")
     words = norm.split()
 
-    # Try longest prefix match first
+    # Try longest prefix match first (handles "Katowice Brynow", "Sosnowiec Centrum")
     for length in range(min(len(words), 4), 0, -1):
         candidate = " ".join(words[:length])
         if candidate in _CITY_KM:
             return _CITY_KM[candidate]
+
+    # Try all consecutive word groups (handles "Brynow , Katowice" → last word = Katowice)
+    for start in range(1, len(words)):
+        for length in range(min(len(words) - start, 3), 0, -1):
+            candidate = " ".join(words[start:start + length])
+            if candidate in _CITY_KM:
+                return _CITY_KM[candidate]
 
     # Nominatim fallback
     return _nominatim(location)

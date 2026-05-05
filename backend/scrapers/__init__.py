@@ -5,7 +5,6 @@ from .truhome import scrape as scrape_truhome
 from .indexo import scrape as scrape_indexo
 from .ire import scrape_ire
 from .offer_card import scrape_offer_card
-from .wgn import scrape as scrape_wgn
 from .kopalnia import scrape as scrape_kopalnia
 from .lukhouse import scrape as scrape_lukhouse
 from .bestnest import scrape as scrape_bestnest
@@ -30,7 +29,6 @@ def get_all_scrapers():
         lambda: scrape_offer_card("MLYNARSCY", "https://www.mlynarscy.com.pl"),
         lambda: scrape_offer_card("KAMA", "https://www.nieruchomoscikama.pl"),
         # individual scrapers
-        scrape_wgn,
         scrape_kopalnia,
         scrape_lukhouse,
         scrape_bestnest,
