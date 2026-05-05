@@ -227,7 +227,7 @@ export default function Home() {
             </div>
             <div>
               <span className="font-semibold text-white">ChataBot</span>
-              <span className="text-gray-500 text-sm ml-2">Katowice ±15 km</span>
+              <span className="text-gray-500 text-sm ml-2">Katowice ±20 km</span>
             </div>
           </div>
           <div className="flex items-center gap-3">
@@ -407,7 +407,7 @@ export default function Home() {
                               <div className="w-12 h-1 bg-gray-800 rounded-full overflow-hidden">
                                 <div
                                   className="h-full bg-indigo-500 rounded-full"
-                                  style={{ width: `${Math.min(100, (l.distance_km / 15) * 100)}%` }}
+                                  style={{ width: `${Math.min(100, (l.distance_km / 20) * 100)}%` }}
                                 />
                               </div>
                               <span className="text-xs text-gray-400">{l.distance_km.toFixed(1)} km</span>
@@ -427,7 +427,7 @@ export default function Home() {
         )}
 
         <footer className="mt-8 text-center text-xs text-gray-700">
-          Filtr: sprzedaż · dom · 100–180 m² · ≤15 km od Katowic · aktualizacja co godzinę
+          Filtr: sprzedaż · dom · 100–180 m² · ≤20 km od Katowic · aktualizacja co godzinę
         </footer>
       </main>
     </div>
