@@ -7,7 +7,7 @@ import requests
 
 KATOWICE_LAT = 50.2649
 KATOWICE_LON = 19.0238
-MAX_DISTANCE_KM = 15.0
+MAX_DISTANCE_KM = 20.0
 
 # Pre-computed distances (km) from Katowice center for Silesian cities
 _CITY_KM = {

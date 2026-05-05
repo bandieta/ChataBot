@@ -8,6 +8,7 @@ from .offer_card import scrape_offer_card
 from .wgn import scrape as scrape_wgn
 from .kopalnia import scrape as scrape_kopalnia
 from .lukhouse import scrape as scrape_lukhouse
+from .bestnest import scrape as scrape_bestnest
 from .base import Listing
 
 
@@ -32,4 +33,5 @@ def get_all_scrapers():
         scrape_wgn,
         scrape_kopalnia,
         scrape_lukhouse,
+        scrape_bestnest,
     ]
